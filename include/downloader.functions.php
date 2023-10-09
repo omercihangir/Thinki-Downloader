@@ -359,6 +359,18 @@ function query($url)
     return $return;
 }
 
+// function progressCallback($downloadSize, $downloaded, $uploadSize, $uploaded) {
+//     global $totalSize, $downloadedSize;
+
+//     if ($downloadSize > 0) {
+//         $percentage = ($downloaded / $downloadSize) * 100;
+//         $downloadedSize = $downloaded;
+//         $totalSize = $downloadSize;
+//         echo "\rDownloaded: " . round($percentage, 2) . "%";
+//         flush();
+//     }
+// }
+
 function fdownload($url, $file_name = null)
 {
     global $clientdate, $cookiedata;
@@ -382,6 +394,11 @@ function fdownload($url, $file_name = null)
     curl_setopt($process, CURLOPT_TIMEOUT, 60);
     curl_setopt($process, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($process, CURLOPT_FOLLOWLOCATION, 0);
+
+    // //DL Progress Tracker
+    // curl_setopt($ch, CURLOPT_NOPROGRESS, false);
+    // curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, 'progressCallback');
+
     $return = curl_exec($process);
     curl_close($process);
 
@@ -446,6 +463,8 @@ function downloadFileChunked($srcUrl, $dstName, $chunkSize = 1, $returnbytes = t
     $http['header'] = $headers;
     $context = stream_context_create(array('http' => $http));
 
+    $totalSize = intval(get_headers($url, true, $context)['Content-Length']);
+
     $chunksize = $chunkSize * (1024 * 1024); // How many bytes per chunk. By default 1MB.
     $data = '';
     $bytesCount = 0;
@@ -457,9 +476,10 @@ function downloadFileChunked($srcUrl, $dstName, $chunkSize = 1, $returnbytes = t
     while (!feof($handle)) {
         $data = fread($handle, $chunksize);
         fwrite($fp, $data, strlen($data));
-        if ($returnbytes) {
-            $bytesCount += strlen($data);
-        }
+        $bytesCount += strlen($data);
+        $percentage = ($bytesCount / $totalSize) * 100;
+        echo "\rDownloaded: " . round($percentage, 2) . "%";
+        flush();
     }
     $status = fclose($handle);
     fclose($fp);
