@@ -65,23 +65,41 @@ function chapterwise_download($datas)
                     // print_r($first_set_matches);
                     
                     if(empty($first_set_matches)) {
-                        echo "No matches found for videos in HTML Item. Continuing...";
+                        echo "No matches found for videos in HTML Item. Continuing..." . PHP_EOL;
                     } else {
                         foreach($first_set_matches as $match) {
                             $video_url = $match[0];
-                            video_downloader_videoproxy($video_url, $content["name"], $video_download_quality);
+                            video_downloader_videoproxy($video_url, $fname, $video_download_quality);
                         }
                     }
 
-                    # Query the API for the video URL
+                    # Find a string similar to https://www.soundslice.com/slices/*/embed
+                    $regex = '/https:\/\/www.soundslice.com\/slices\/[a-zA-Z0-9]+\/embed/';
+                    preg_match_all($regex, $temp2, $matches, PREG_SET_ORDER, 0);
+                    $first_set_matches = array_unique($matches, SORT_REGULAR);
 
-                    # Find a string similar to https://fast.wistia.com/embed/medias/*.jsonp
+                    if(!empty($first_set_matches)) {
+                        foreach($first_set_matches as $match) {
+                            $embed_video_url = $match[0];
+                            video_downloader_soundslice($embed_video_url);
+                        }
+                    }
 
-                    // # FInd all iframe src links which contain https://platform.thinkific.com/videoproxy/v1/play/*
-                    // $regex = '/<iframe.*?src="(https:\/\/platform.thinkific.com\/videoproxy\/v1\/play\/[a-zA-Z0-9]+)".*?<\/iframe>/';
-                    // preg_match_all($regex, $temp2, $matches, PREG_SET_ORDER, 0);
-                    // $matches = array_unique($matches, SORT_REGULAR);
-                    // print_r($matches);
+                    # Find a string similar to https://fast.wistia.net/embed/iframe/*
+                    $regex = '/https:\/\/fast.wistia.net\/embed\/iframe\/[a-zA-Z0-9]+/';
+                    preg_match_all($regex, $temp2, $matches, PREG_SET_ORDER, 0);
+                    $first_set_matches = array_unique($matches, SORT_REGULAR);
+
+                    if(!empty($first_set_matches)) {
+                        foreach($first_set_matches as $match) {
+                            $embed_video_url = $match[0];
+                            
+                            $wistia_id = explode("/", $embed_video_url);
+                            $wistia_id = end($wistia_id);
+                            video_downloader_wistia($wistia_id, $fname, $video_download_quality);
+                        }
+                    }
+
                     $fname = str_replace(" ","-",$fname);
                     $myfile = fopen($fname, "w");
                     fwrite($myfile, $temp2);
@@ -215,6 +233,21 @@ function chapterwise_download($datas)
                     foreach ($result["questions"] as $qs) {
                         $choice = 'A';
                         $file_contents_with_answers = $file_contents_with_answers . ++$qs["position"] . ") " . "<strong>" . unicode_decode($qs["prompt"]) . "</strong>" . "Explanation: " . unicode_decode($qs["text_explanation"]) . "<br><br>";
+
+                        $decoded_prompt = unicode_decode($qs["prompt"]);
+
+                        $pattern = '/fast.wistia.net\/embed\/iframe\/[a-zA-Z0-9]+/';
+                        preg_match_all($pattern, $decoded_prompt, $matches, PREG_SET_ORDER, 0);
+                        $first_set_matches = array_unique($matches, SORT_REGULAR);
+                        if(!empty($first_set_matches)) {
+                            foreach($first_set_matches as $match) {
+                                $embed_video_url = $match[0];
+                                $wistia_id = explode("/", $embed_video_url);
+                                $wistia_id = end($wistia_id);
+                                video_downloader_wistia($wistia_id, "QA Video ".$qs["position"], $video_download_quality);
+                            }
+                        }
+
                         $file_contents_with_questions = $file_contents_with_questions . $qs["position"] . ") " . "<strong>" . unicode_decode($qs["prompt"]) . "</strong>" . "<br><br>";
                         foreach ($result["choices"] as $ch) {
                             if ($ch["question_id"] == $qs["id"]) {
@@ -451,6 +484,26 @@ function query($url)
     curl_close($process);
     return $return;
 }
+
+function query_opts($url, $headers = []) {
+    $headers[] = 'Accept: */*';
+    $useragent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36';
+    $process = curl_init($url);
+    curl_setopt($process, CURLOPT_POST, 0);
+    curl_setopt($process, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($process, CURLOPT_HEADER, 0);
+    curl_setopt($process, CURLOPT_USERAGENT, $useragent);
+    curl_setopt($process, CURLOPT_ENCODING, 'gzip,deflate,br');
+    curl_setopt($process, CURLOPT_TIMEOUT, 60);
+    curl_setopt($process, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($process, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($process, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($process, CURLOPT_FOLLOWLOCATION, 1);
+    $return = curl_exec($process);
+    curl_close($process);
+    return $return;
+}
+
 
 function fdownload($url, $file_name = null)
 {

@@ -11,6 +11,7 @@ echo "----------------------------------------------------------".PHP_EOL;
 require("include/file.functions.php");
 require("include/downloader.functions.php");
 require("include/wistia.downloader.php");
+require("include/soundslice.downloader.php");
 
 // Run.
 // If --json, then read from json file.
